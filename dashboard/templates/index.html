@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🪤 ShellSnare - Reverse Shell Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --primary: #3b82f6;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 2rem;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 1rem;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .live-badge {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background-color: var(--danger);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: var(--surface);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+        th {
+            background-color: #0f172a;
+            color: #94a3b8;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        .payload {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #0f172a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #10b981;
+            font-size: 0.85rem;
+        }
+        .badge {
+            background-color: rgba(59, 130, 246, 0.2);
+            color: var(--primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .badge.bash { color: #f43f5e; background-color: rgba(244, 63, 94, 0.2); }
+        .badge.python { color: #eab308; background-color: rgba(234, 179, 8, 0.2); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🪤 ShellSnare <span style="font-size: 1rem; font-weight: normal; color: #94a3b8;">Detection Dashboard</span></h1>
+        <div class="live-badge">
+            <div class="pulse"></div>
+            LIVE MONITORING
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Signature Match</th>
+                <th>Source (Victim)</th>
+                <th>Destination (Attacker)</th>
+                <th>Payload Snippet</th>
+            </tr>
+        </thead>
+        <tbody id="alerts-body">
+            <!-- Data populated via JS -->
+            <tr>
+                <td colspan="5" style="text-align: center; color: #94a3b8;">Waiting for network traffic...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        function getBadgeClass(type) {
+            type = type.toLowerCase();
+            if (type.includes('bash')) return 'bash';
+            if (type.includes('python')) return 'python';
+            return '';
+        }
+
+        async function fetchAlerts() {
+            try {
+                const response = await fetch('/api/alerts');
+                const alerts = await response.json();
+                
+                const tbody = document.getElementById('alerts-body');
+                
+                if (alerts.length === 0) return;
+                
+                tbody.innerHTML = '';
+                alerts.forEach(alert => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="color: #cbd5e1; font-size: 0.9rem;">${alert.timestamp}</td>
+                        <td><span class="badge ${getBadgeClass(alert.shell_type)}">${alert.shell_type}</span></td>
+                        <td style="font-family: monospace;">${alert.src_ip}</td>
+                        <td style="font-family: monospace; color: #ef4444;">${alert.dst_ip}:${alert.dst_port}</td>
+                        <td><span class="payload">${alert.payload_snippet.substring(0, 50)}...</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Failed to fetch alerts:", err);
+            }
+        }
+
+        // Poll every 2 seconds
+        setInterval(fetchAlerts, 2000);
+        fetchAlerts();
+    </script>
+</body>
+</html>
