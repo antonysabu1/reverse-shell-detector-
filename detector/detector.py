@@ -39,8 +39,8 @@ def main():
     models.init_db()
     print("[*] Sniffing for reverse shell traffic...")
     
-    # Sniff all traffic, don't store in memory, pass to analyze_packet
-    sniff(prn=analyze_packet, store=False)
+    # Sniff TCP traffic, don't store in memory, pass to analyze_packet
+    sniff(filter="tcp", prn=analyze_packet, store=False)
 
 if __name__ == "__main__":
     main()
