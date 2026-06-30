@@ -22,9 +22,22 @@ def get_db_connection():
             src_ip TEXT,
             dst_ip TEXT,
             dst_port INTEGER,
-            payload_snippet TEXT
+            payload_snippet TEXT,
+            confidence REAL DEFAULT 0.0,
+            reason TEXT DEFAULT ''
         )
     ''')
+    
+    # Check if confidence and reason columns exist (for migration if table already existed)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(alerts)")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    if "confidence" not in columns:
+        cursor.execute("ALTER TABLE alerts ADD COLUMN confidence REAL DEFAULT 0.0")
+    if "reason" not in columns:
+        cursor.execute("ALTER TABLE alerts ADD COLUMN reason TEXT DEFAULT ''")
+        
     conn.commit()
     return conn
 

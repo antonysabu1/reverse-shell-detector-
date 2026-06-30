@@ -96,6 +96,14 @@
         }
         .badge.bash { color: #f43f5e; background-color: rgba(244, 63, 94, 0.2); }
         .badge.python { color: #eab308; background-color: rgba(234, 179, 8, 0.2); }
+        .badge.signature { color: #ef4444; background-color: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); }
+        .badge.heuristic { color: #f59e0b; background-color: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); }
+        .badge.statistical { color: #3b82f6; background-color: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); }
+        .badge.other { color: #10b981; background-color: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); }
+        .reason-text {
+            color: #cbd5e1;
+            font-size: 0.85rem;
+        }
     </style>
 </head>
 <body>
@@ -112,16 +120,18 @@
         <thead>
             <tr>
                 <th>Timestamp</th>
-                <th>Signature Match</th>
+                <th>Detection Method</th>
+                <th>Confidence</th>
                 <th>Source (Victim)</th>
                 <th>Destination (Attacker)</th>
+                <th>Reason</th>
                 <th>Payload Snippet</th>
             </tr>
         </thead>
         <tbody id="alerts-body">
             <!-- Data populated via JS -->
             <tr>
-                <td colspan="5" style="text-align: center; color: #94a3b8;">Waiting for network traffic...</td>
+                <td colspan="7" style="text-align: center; color: #94a3b8;">Waiting for network traffic...</td>
             </tr>
         </tbody>
     </table>
@@ -129,9 +139,26 @@
     <script>
         function getBadgeClass(type) {
             type = type.toLowerCase();
-            if (type.includes('bash')) return 'bash';
-            if (type.includes('python')) return 'python';
-            return '';
+            if (type.includes('signature')) return 'signature';
+            if (type.includes('heuristic')) return 'heuristic';
+            if (type.includes('statistical')) return 'statistical';
+            return 'other';
+        }
+
+        function getConfidencePill(confidence) {
+            let color = '#3b82f6';
+            let bg = 'rgba(59, 130, 246, 0.2)';
+            let border = '1px solid rgba(59, 130, 246, 0.4)';
+            if (confidence >= 0.85) {
+                color = '#ef4444';
+                bg = 'rgba(239, 68, 68, 0.2)';
+                border = '1px solid rgba(239, 68, 68, 0.4)';
+            } else if (confidence >= 0.50) {
+                color = '#f59e0b';
+                bg = 'rgba(245, 158, 11, 0.2)';
+                border = '1px solid rgba(245, 158, 11, 0.4)';
+            }
+            return `<span class="badge" style="color: ${color}; background-color: ${bg}; border: ${border}; font-weight: bold;">${Math.round(confidence * 100)}%</span>`;
         }
 
         async function fetchAlerts() {
@@ -146,11 +173,15 @@
                 tbody.innerHTML = '';
                 alerts.forEach(alert => {
                     const tr = document.createElement('tr');
+                    const conf = alert.confidence !== undefined ? alert.confidence : 1.0;
+                    const reason = alert.reason || 'N/A';
                     tr.innerHTML = `
                         <td style="color: #cbd5e1; font-size: 0.9rem;">${alert.timestamp}</td>
                         <td><span class="badge ${getBadgeClass(alert.shell_type)}">${alert.shell_type}</span></td>
+                        <td>${getConfidencePill(conf)}</td>
                         <td style="font-family: monospace;">${alert.src_ip}</td>
                         <td style="font-family: monospace; color: #ef4444;">${alert.dst_ip}:${alert.dst_port}</td>
+                        <td class="reason-text">${reason}</td>
                         <td><span class="payload">${alert.payload_snippet.substring(0, 50)}...</span></td>
                     `;
                     tbody.appendChild(tr);
