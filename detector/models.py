@@ -20,25 +20,39 @@ def init_db():
             src_ip TEXT,
             dst_ip TEXT,
             dst_port INTEGER,
-            payload_snippet TEXT
+            payload_snippet TEXT,
+            confidence REAL DEFAULT 0.0,
+            reason TEXT DEFAULT ''
         )
     ''')
+    
+    # Check if confidence and reason columns exist (for migration if table already existed)
+    cursor.execute("PRAGMA table_info(alerts)")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    if "confidence" not in columns:
+        cursor.execute("ALTER TABLE alerts ADD COLUMN confidence REAL DEFAULT 0.0")
+    if "reason" not in columns:
+        cursor.execute("ALTER TABLE alerts ADD COLUMN reason TEXT DEFAULT ''")
     
     conn.commit()
     conn.close()
     print("[*] Database initialized at", DB_PATH)
 
-def save_alert(shell_type, src_ip, dst_ip, dst_port, payload_snippet):
+def save_alert(shell_type, src_ip, dst_ip, dst_port, payload_snippet, confidence=0.0, reason=''):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     # Clean up snippet for display
-    clean_snippet = str(payload_snippet)[:100]
+    if isinstance(payload_snippet, bytes):
+        clean_snippet = payload_snippet.decode(errors='ignore')[:100]
+    else:
+        clean_snippet = str(payload_snippet)[:100]
     
     cursor.execute('''
-        INSERT INTO alerts (shell_type, src_ip, dst_ip, dst_port, payload_snippet)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (shell_type, src_ip, dst_ip, dst_port, clean_snippet))
+        INSERT INTO alerts (shell_type, src_ip, dst_ip, dst_port, payload_snippet, confidence, reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (shell_type, src_ip, dst_ip, dst_port, clean_snippet, confidence, reason))
     
     conn.commit()
     conn.close()
