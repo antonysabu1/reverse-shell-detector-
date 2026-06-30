@@ -2,37 +2,42 @@ import os
 import sys
 from scapy.all import sniff, IP, TCP, Raw
 import models
-
-# Common reverse shell payload signatures
-SIGNATURES = {
-    "Bash TCP": b"bash -i",
-    "Bash TCP (Dev)": b"/dev/tcp/",
-    "Netcat Execute": b"nc -e",
-    "Python Socket": b"import socket",
-    "PHP Socket": b"fsockopen"
-}
+from analyzers import signature, heuristic, statistical
 
 def analyze_packet(packet):
     # Only inspect TCP packets with a raw payload
-    if packet.haslayer(TCP) and packet.haslayer(Raw):
+    if packet.haslayer(IP) and packet.haslayer(TCP) and packet.haslayer(Raw):
         payload = packet[Raw].load
+        src_ip = packet[IP].src
+        dst_ip = packet[IP].dst
+        dst_port = packet[TCP].dport
         
-        # Check against known signatures
-        for shell_type, sig in SIGNATURES.items():
-            if sig in payload:
-                src_ip = packet[IP].src
-                dst_ip = packet[IP].dst
-                dst_port = packet[TCP].dport
-                
-                print(f"=====================================================")
-                print(f"🚨 ALERT: Reverse Shell Detected!")
-                print(f"🛡️  Type: {shell_type}")
-                print(f"📡 Connection: {src_ip} -> {dst_ip}:{dst_port}")
-                print(f"📦 Payload snippet: {payload[:50]}...")
-                print(f"=====================================================")
-                
-                # Save to database
-                models.save_alert(shell_type, src_ip, dst_ip, dst_port, payload)
+        # Run all analyzers
+        sig_matches = signature.analyze(payload, dst_port)
+        heu_matches = heuristic.analyze(payload, dst_port)
+        stat_matches = statistical.analyze(payload, dst_port)
+        
+        all_matches = sig_matches + heu_matches + stat_matches
+        
+        if all_matches:
+            # Aggregate matches: sort by confidence descending
+            all_matches.sort(key=lambda x: x["confidence"], reverse=True)
+            best_match = all_matches[0]
+            
+            shell_type = best_match["type"]
+            confidence = best_match["confidence"]
+            reason = "; ".join(list(set(m["reason"] for m in all_matches)))
+            
+            print(f"=====================================================")
+            print(f"🚨 ALERT: Reverse Shell Activity Detected!")
+            print(f"🛡️  Type: {shell_type} (Confidence: {confidence:.2f})")
+            print(f"📡 Connection: {src_ip} -> {dst_ip}:{dst_port}")
+            print(f"📝 Reason: {reason}")
+            print(f"📦 Payload snippet: {payload[:50]}...")
+            print(f"=====================================================")
+            
+            # Save to database
+            models.save_alert(shell_type, src_ip, dst_ip, dst_port, payload, confidence, reason)
 
 def main():
     print("[*] Starting ShellSnare Detection Engine...")
