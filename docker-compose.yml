@@ -9,6 +9,9 @@ services:
       - lab_network
     volumes:
       - ./attacker:/opt/attacker
+    ports:
+      - "4444:4444"
+      - "5353:5353"
     stdin_open: true # Allows interactive terminal
     tty: true
 
