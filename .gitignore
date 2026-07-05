@@ -22,3 +22,4 @@ Thumbs.db
 
 # Generated Certs
 attacker/certs/
+detector/alerts.db
