@@ -2,190 +2,111 @@
 
 # 🪤 ShellSnare
 
-**A Dockerized cybersecurity lab for simulating, capturing, and detecting reverse shell connections.**
+**A containerized Intrusion Detection & Prevention System (IDS/IPS) for reverse shell attacks**
 
-Multi-layered traffic analysis • Real-time dashboard • 6+ shell types • Fully isolated
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docker.com)
+[![Scapy](https://img.shields.io/badge/Scapy-Packet%20Analysis-green)](https://scapy.net)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-required-blue?logo=docker)](https://www.docker.com/)
-[![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://www.python.org/)
+ShellSnare is a fully self-contained cybersecurity lab that **simulates, detects, and actively blocks** reverse shell attacks using live packet analysis. Built with Docker, Python, and Scapy — runs entirely on your local machine.
+
+![ShellSnare Dashboard](docs/dashboard.png)
 
 </div>
 
 ---
 
-## What is ShellSnare?
+## 🧠 How It Works
 
-Reverse shells are the most common post-exploitation technique used by attackers to maintain remote access to compromised systems. Unlike regular connections, reverse shells originate from the *victim* and connect outbound to the attacker — bypassing most firewall rules.
+ShellSnare creates an isolated Docker network with four containers that communicate with each other in a controlled attack simulation:
 
-ShellSnare is a controlled, isolated lab environment for studying how reverse shell connections behave on a network, and how to detect them. Everything runs inside Docker — no real systems are touched.
+![Architecture Diagram](docs/architecture.png)
 
-**What you get:**
-
-- 🗡️ **Controlled Simulations** — Launch 6+ reverse shell types in a sandboxed environment
-- 🔎 **Multi-Layered Detection** — Heuristic, statistical, and signature-based traffic analysis
-- 📊 **Real-Time Dashboard** — Monitor detections, inspect payloads, and visualize attack patterns
-- 🧪 **Study Platform** — Compare detection effectiveness, test evasion, build intuition for malicious traffic
-
----
-
-## Architecture
-
-ShellSnare runs as a 4-container Docker lab on a shared internal network:
-
-```
-┌──────────────────────── Docker Network: shellsnare_lab ────────────────────────┐
-│                                                                                │
-│   ┌──────────────┐         reverse shell          ┌──────────────┐             │
-│   │  🗡️ Attacker  │◄────────────────────────────────│  💻 Victim    │          │
-│   │  C2 Listener  │         connection              │  Shell Sim   │           │
-│   └──────────────┘                                 └──────────────┘            │
-│          ▲                                                ▲                    │
-│          │              packet capture                    │                    │
-│          └──────────────────┐ ┌───────────────────────────┘                    │
-│                        ┌────▼─▼─────┐                                          │
-│                        │ 🔎 Detector │                                         │
-│                        │   Analysis  │                                         │
-│                        │   Engine    │                                         │
-│                        └─────┬──────┘                                          │
-│                              │ alerts & metrics                                │
-│                        ┌─────▼──────┐                                          │
-│                        │ 📊 Dashboard│──── Port 8080 ────► 👤 Browser          │
-│                        │   Web UI    │                                         │
-│                        └────────────┘                                          │
-└────────────────────────────────────────────────────────────────────────────────┘
-```
-
-| Container | Purpose | Stack |
-|-----------|---------|-------|
-| **Attacker** | Listens for incoming reverse shell connections, acts as C2 | Netcat, Socat, Python |
-| **Victim** | Executes controlled reverse shell payloads on demand | Bash, Python, Netcat, PHP |
-| **Detector** | Captures all network traffic and runs detection analysis | Python, Scapy, SQLite |
-| **Dashboard** | Serves a real-time web interface for monitoring | Flask, Chart.js, WebSocket |
+| Container | Role | Stack |
+|-----------|------|-------|
+| 🗡️ **Attacker** | Listens for incoming reverse shells on multiple ports; acts as a C2 server | Netcat, Socat, Python |
+| 💻 **Victim** | Executes reverse shell payloads on demand via an interactive launcher | Bash, Python, PHP, Socat |
+| 🔎 **Detector** | Sniffs all traffic on the network, analyzes packets, and injects TCP RST to block connections | Python, Scapy, SQLite |
+| 📊 **Dashboard** | Serves a real-time web UI showing detections and blocked connections | Flask, HTML/CSS/JS |
 
 ---
 
-## Detection Engine
+## ✨ Features
 
-ShellSnare uses three complementary detection layers to maximize coverage across shell types:
+### 🔍 Three-Layer Detection Engine
+- **Signature-Based** — Pattern matches against known payloads (`bash -i`, `import socket`, `fsockopen`, `nc -e`, etc.)
+- **Heuristic Analysis** — Detects interactive shell prompts, suspicious ports, small bidirectional packet patterns, and DNS C2 beacons
+- **Statistical Analysis** — Flags high Shannon entropy (encrypted shells), large HTTP payload exfiltration, and abnormal byte ratios
 
-### 🔤 Signature-Based Detection
-Pattern matching against known reverse shell payloads:
-- `/bin/bash -i >& /dev/tcp/` — Bash TCP reverse shell
-- `python -c 'import socket,subprocess'` — Python socket shell
-- `nc -e /bin/bash` — Netcat with execute flag
-- Base64/hex encoded shell patterns
+### 🛑 Active IPS — TCP RST Injection
+When a connection is detected with **≥ 85% confidence**, ShellSnare forges and injects TCP RST packets in both directions using Scapy, **instantly severing the attacker's connection**.
 
-### 🧩 Heuristic Analysis
-Behavioral indicators that flag suspicious activity:
-- **Interactive Session Detection** — Small bidirectional packets with human-speed timing
-- **Outbound Connection Profiling** — Unexpected connections to non-standard ports
-- **Long-Duration Tracking** — Persistent connections typical of C2 channels
-- **Shell Prompt Detection** — Regex matching for `$`, `#`, and shell-like prompts in payloads
+### 🎛️ 6 Simulated Shell Types
 
-### 📊 Statistical Analysis
-Mathematical anomaly detection for encrypted/obfuscated shells:
-- **Packet Size Distribution** — Reverse shells produce distinct small-packet patterns
-- **Inter-Arrival Time Analysis** — Human typing cadence vs. machine-speed transfers
-- **Payload Entropy** — High entropy signals encryption or encoding
-- **Byte Ratio Analysis** — Asymmetric ratios (small commands → large outputs)
-- **Beaconing Detection** — Periodic callback patterns from staged shells
+| Shell Type | Protocol | Detection Challenge |
+|------------|----------|-------------------|
+| Bash TCP | Raw TCP | 🟢 Easy |
+| Python Socket | Raw TCP | 🟡 Medium |
+| PHP `fsockopen` | Raw TCP | 🟡 Medium |
+| HTTP Reverse Shell | HTTP w/ custom header | 🟡 Medium |
+| Socat SSL/TLS | Encrypted TCP | 🔴 Hard |
+| DNS C2 Tunnel | DNS TXT queries | 🔴 Hard |
 
----
-
-## Simulated Shell Types
-
-| Type | Detection Difficulty | Description |
-|------|---------------------|-------------|
-| Bash TCP | 🟢 Easy | Classic `/dev/tcp` based reverse shell |
-| Netcat | 🟢 Easy | Traditional `nc -e` reverse shell |
-| Python | 🟡 Medium | Socket + subprocess based shell |
-| PHP | 🟡 Medium | `fsockopen` based reverse shell |
-| Socat Encrypted | 🔴 Hard | SSL/TLS encrypted reverse shell |
-| DNS Tunneled | 🔴 Hard | Commands tunneled over DNS queries |
+### 📊 Real-Time Dashboard
+- Live alert table with auto-refresh
+- **BLOCKED 🛑** / **Detected 👁️** action badges per alert
+- Confidence scoring (Low / Medium / High)
+- Filterable by detection method (Signature, Heuristic, Statistical, DNS C2, HTTP Shell)
+- 4 live stat cards: Total Alerts, High Confidence, Unique Sources, Connections Blocked
 
 ---
 
-## Dashboard
-
-The real-time web dashboard at `http://localhost:8080` provides:
-
-- 🔴 **Live Alert Feed** — Chronological stream of detected reverse shell events
-- 🗺️ **Network Flow Map** — Visual representation of connections between containers
-- 📈 **Traffic Statistics** — Packet rates, byte ratios, and entropy charts
-- 🔍 **Payload Inspector** — Hex/ASCII view of captured suspicious payloads
-- 🏷️ **Attack Classification** — Auto-categorization of detected shell types
-- 📊 **Confidence Scoring** — Multi-indicator confidence gauge per detection
-- ⏪ **Session Replay** — Reconstruct and review captured shell sessions
-
----
-
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
-
-- [Docker](https://www.docker.com/) v20.10+
+- [Docker](https://docs.docker.com/get-docker/) v20.10+
 - [Docker Compose](https://docs.docker.com/compose/) v2.0+
 
-### Installation
+### 1. Clone & Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/yourusername/shellsnare.git
 cd shellsnare
-
-# Build and start all containers
-docker compose up --build
-```
-
-Then open **http://localhost:8080** in your browser.
-
----
-
-## Usage
-
-### 1. Start the lab
-
-```bash
 docker compose up --build -d
 ```
 
-All four containers start automatically. The detector begins capturing traffic immediately.
+### 2. Open the Dashboard
 
-### 2. Launch a reverse shell
+Visit **http://localhost:8080** in your browser.
 
-Open a terminal on the victim container:
-
-```bash
-docker exec -it shellsnare-victim bash
-```
-
-Use the interactive launcher to pick a shell type:
+### 3. Launch a Reverse Shell
 
 ```bash
-python3 launcher.py
+# Open a shell on the victim container
+docker exec -it shellsnare-victim python3 launcher.py
 ```
 
+You'll see an interactive menu:
+
 ```
-╔══════════════════════════════════════╗
-║     ShellSnare - Shell Launcher     ║
-╠══════════════════════════════════════╣
-║  1. Bash TCP Reverse Shell          ║
-║  2. Netcat Reverse Shell            ║
-║  3. Python Reverse Shell            ║
-║  4. PHP Reverse Shell               ║
-║  5. Socat Encrypted Shell           ║
-║  6. DNS Tunnel Shell                ║
-║  0. Exit                            ║
-╚══════════════════════════════════════╝
-Select shell type:
+╔═════════════════════════════════════════╗
+║  🪤  ShellSnare — Shell Launcher        ║
+╠═════════════════════════════════════════╣
+║  1. Bash TCP Reverse Shell              ║
+║  2. Python Socket Shell                 ║
+║  3. PHP Reverse Shell                   ║
+║  4. HTTP Reverse Shell (beacon)         ║
+║  5. SSL Encrypted Shell (socat)         ║
+║  6. DNS C2 Tunnel                       ║
+║  7. Fire All Simulators                 ║
+║  0. Exit                                ║
+╚═════════════════════════════════════════╝
 ```
 
-### 3. Watch the dashboard
+Pick any shell type and watch the dashboard light up with detections in real time.
 
-Open **http://localhost:8080** to see detections appear in real time as you run shells.
-
-### 4. Stop the lab
+### 4. Tear Down
 
 ```bash
 docker compose down
@@ -193,84 +114,92 @@ docker compose down
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 shellsnare/
-├── docker-compose.yml            # Orchestrates all 4 containers
+├── docker-compose.yml          # Orchestrates all 4 containers on an isolated network
+├── docs/                       # Screenshots and diagrams
 │
 ├── attacker/
 │   ├── Dockerfile
-│   ├── listener.sh               # Netcat/socat listener scripts
-│   └── c2_server.py              # Simple C2 for advanced shells
+│   ├── listener.sh             # Basic netcat listener
+│   └── scripts/
+│       ├── ssl_listener.sh     # Socat SSL/TLS listener
+│       ├── multi_listener.sh   # Binds all ports simultaneously
+│       └── dns_server.py       # Minimal DNS C2 server
 │
 ├── victim/
 │   ├── Dockerfile
-│   ├── launcher.py               # Menu-driven shell launcher
-│   └── shells/
-│       ├── bash_revshell.sh
-│       ├── nc_revshell.sh
-│       ├── python_revshell.py
-│       ├── php_revshell.php
-│       └── encrypted_revshell.sh
+│   ├── launcher.py             # Interactive shell launcher menu
+│   └── scripts/
+│       ├── ssl_reverse.sh      # Socat encrypted reverse shell
+│       ├── python_reverse.py   # Python socket reverse shell
+│       ├── php_reverse.sh      # PHP fsockopen reverse shell
+│       └── http_reverse.sh     # HTTP beacon shell
 │
 ├── detector/
 │   ├── Dockerfile
-│   ├── detector.py               # Main detection engine
-│   ├── config.py                 # Thresholds & configuration
-│   ├── models.py                 # SQLite models & schema
+│   ├── detector.py             # Main sniffing loop + IPS trigger
+│   ├── ips.py                  # TCP RST injection module (Scapy)
+│   ├── config.py               # Thresholds and constants
+│   ├── models.py               # SQLite schema and helpers
 │   └── analyzers/
-│       ├── heuristic.py
-│       ├── statistical.py
-│       └── signature.py
+│       ├── signature.py        # Payload pattern matching
+│       ├── heuristic.py        # Behavioral indicators
+│       └── statistical.py      # Entropy, packet size analysis
 │
 └── dashboard/
     ├── Dockerfile
-    ├── app.py                    # Flask backend + WebSocket API
-    ├── templates/
-    │   └── index.html
-    └── static/
-        ├── css/style.css
-        └── js/dashboard.js
+    ├── app.py                  # Flask API server
+    └── templates/
+        └── index.html          # Single-page glassmorphism UI
 ```
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
-Detection thresholds can be tuned in `detector/config.py`:
+All detection thresholds are tunable in [`detector/config.py`](detector/config.py):
 
 ```python
-# Packet size threshold for interactive session detection
-INTERACTIVE_PKT_SIZE = 128        # bytes
+CONFIDENCE_LOW    = 0.30   # Log only
+CONFIDENCE_MEDIUM = 0.60   # Highlight in dashboard
+CONFIDENCE_HIGH   = 0.85   # Trigger IPS (TCP RST injection)
 
-# Minimum packets to classify as interactive session
-MIN_INTERACTIVE_PACKETS = 10
-
-# Entropy threshold for encrypted shell detection
-ENTROPY_THRESHOLD = 7.0           # bits per byte (max 8.0)
-
-# Beaconing detection interval tolerance
-BEACON_INTERVAL_TOLERANCE = 0.15  # 15% variance
-
-# Alert confidence thresholds
-CONFIDENCE_LOW    = 0.30
-CONFIDENCE_MEDIUM = 0.60
-CONFIDENCE_HIGH   = 0.85
+ENTROPY_THRESHOLD = 5.0    # Shannon bits/byte — flags encrypted shells
+SHELL_PORTS = [4444, 5555, 8080, 9001, 1337, 31337]  # Suspicious outbound ports
 ```
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Container orchestration | Docker Compose |
+| Packet capture & injection | [Scapy](https://scapy.net) |
+| Detection algorithms | Python (regex, entropy, heuristics) |
+| Data persistence | SQLite |
+| Web backend | Flask |
+| Web frontend | Vanilla HTML/CSS/JS (glassmorphism UI) |
 
 ---
 
 ## ⚠️ Disclaimer
 
-This project is intended for **educational and research purposes only.**
+This project is for **educational and research purposes only**.
 
-ShellSnare is a controlled lab environment for studying network-based detection of reverse shell connections. All simulations run within isolated Docker containers on your local machine.
-
-**Do not use the techniques or tools in this project against systems you do not own or have explicit authorization to test.** Unauthorized access to computer systems is illegal. The authors are not responsible for any misuse of this software.
+All simulations run within isolated Docker containers on your local machine. Do not use any of these techniques against systems you do not own or have explicit permission to test. Unauthorized access to computer systems is illegal.
 
 ---
 
-## License
+## 📄 License
 
 [MIT](LICENSE) — free to use, modify, and distribute.
+
+---
+
+<div align="center">
+Built with ☕ and way too much interest in network security
+</div>
