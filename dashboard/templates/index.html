@@ -464,9 +464,9 @@
             <div class="stat-sub">Victim IPs</div>
         </div>
         <div class="stat-card success">
-            <div class="stat-label">Detection Methods</div>
-            <div class="stat-value" id="stat-methods">0</div>
-            <div class="stat-sub">Distinct types seen</div>
+            <div class="stat-label">Connections Blocked</div>
+            <div class="stat-value" id="stat-blocked">0</div>
+            <div class="stat-sub">TCP resets injected</div>
         </div>
     </div>
 
@@ -493,6 +493,7 @@
                     <th>Timestamp</th>
                     <th>Detection Method</th>
                     <th>Confidence</th>
+                    <th>Action</th>
                     <th>Source</th>
                     <th>Destination</th>
                     <th>Reason</th>
@@ -501,7 +502,7 @@
             </thead>
             <tbody id="alerts-body">
                 <tr>
-                    <td colspan="7">
+                    <td colspan="8">
                         <div class="empty-state">
                             <div class="icon">🔎</div>
                             <p>Waiting for network traffic…</p>
@@ -590,8 +591,8 @@
         document.getElementById('stat-high').textContent    = allAlerts.filter(a => (a.confidence || 0) >= 0.85).length;
         const srcs = new Set(allAlerts.map(a => a.src_ip).filter(Boolean));
         document.getElementById('stat-srcs').textContent   = srcs.size;
-        const methods = new Set(allAlerts.map(a => getBadgeClass(a.shell_type || '')));
-        document.getElementById('stat-methods').textContent = methods.size;
+        const blocked = allAlerts.filter(a => (a.action_taken || '').includes('Blocked'));
+        document.getElementById('stat-blocked').textContent = blocked.length;
     }
 
     // ── Render ─────────────────────────────────────────────────────
@@ -604,7 +605,7 @@
         const tbody = document.getElementById('alerts-body');
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">🔎</div><p>No alerts matching current filter.</p></div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">🔎</div><p>No alerts matching current filter.</p></div></td></tr>`;
             return;
         }
 
@@ -616,10 +617,16 @@
             const tr = document.createElement('tr');
             if (isNew) tr.classList.add('new-row');
             tr.style.animationDelay = `${idx * 30}ms`;
+            const actionText = alert.action_taken || 'Detected';
+            const actionBadge = actionText.includes('Blocked') ? 
+                `<span class="det-badge sig" style="font-weight: 800;">BLOCKED 🛑</span>` : 
+                `<span class="det-badge stat" style="color: #94a3b8; background: transparent; border-color: rgba(148,163,184,0.3);">Detected 👁️</span>`;
+                
             tr.innerHTML = `
                 <td><span class="ts">${alert.timestamp || '—'}</span></td>
                 <td><span class="det-badge ${bClass}">${getBadgeLabel(alert.shell_type || 'Unknown')}</span></td>
                 <td><span class="conf-pill ${confClass(conf)}">${Math.round(conf * 100)}%</span></td>
+                <td>${actionBadge}</td>
                 <td><span class="ip ip-src">${alert.src_ip || '—'}</span></td>
                 <td><span class="ip ip-dst">${alert.dst_ip || '—'}:${alert.dst_port || '?'}</span></td>
                 <td><span class="reason">${alert.reason || '—'}</span></td>
