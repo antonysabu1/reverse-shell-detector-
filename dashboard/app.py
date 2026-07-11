@@ -24,11 +24,12 @@ def get_db_connection():
             dst_port INTEGER,
             payload_snippet TEXT,
             confidence REAL DEFAULT 0.0,
-            reason TEXT DEFAULT ''
+            reason TEXT DEFAULT '',
+            action_taken TEXT DEFAULT 'Detected'
         )
     ''')
     
-    # Check if confidence and reason columns exist (for migration if table already existed)
+    # Check if confidence, reason, and action_taken columns exist (for migration if table already existed)
     cursor = conn.cursor()
     cursor.execute("PRAGMA table_info(alerts)")
     columns = [col[1] for col in cursor.fetchall()]
@@ -37,6 +38,8 @@ def get_db_connection():
         cursor.execute("ALTER TABLE alerts ADD COLUMN confidence REAL DEFAULT 0.0")
     if "reason" not in columns:
         cursor.execute("ALTER TABLE alerts ADD COLUMN reason TEXT DEFAULT ''")
+    if "action_taken" not in columns:
+        cursor.execute("ALTER TABLE alerts ADD COLUMN action_taken TEXT DEFAULT 'Detected'")
         
     conn.commit()
     return conn
